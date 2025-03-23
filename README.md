@@ -5,3 +5,7 @@
 - All products and their details, including the category, will be saved in each brand's csv to be used as features in ml models or neural networks
 <br><br>
 If things go smooth n easy as it is so far, may attempt first image recognition clustering with certain products' images (graphic/stitched/etc. clothings) for patterns
+
+# Commit 1
+- Mnml denim products scraped
+- Prada outwear products scraped
