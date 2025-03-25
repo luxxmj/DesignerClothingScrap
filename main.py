@@ -25,7 +25,7 @@ options.headless = True
 driver = Firefox(options=options)
 
 # Indicate brand, (will add category soon)
-scraping = 'lv'
+scraping = 'bb'
 
 luxuryUrls = {
     "prada": {
@@ -40,6 +40,7 @@ luxuryUrls = {
     "lv": {
         "outerwear": "https://us.louisvuitton.com/eng-us/men/ready-to-wear/coats/_/N-t1epdz97"
     },
+    "bb": {"outerwear": "https://us.burberry.com/l/mens-coats-jackets/"},
 }
 
 streetwearUrls = {
@@ -50,7 +51,7 @@ streetwearUrls = {
  
 
 headers = {
-    # Add your own header
+    "User-Agent": '' # Paste your user agent
 }
 
 # For excluding a certain nested listed item (unavailable size item)
@@ -106,7 +107,7 @@ def main():
             price = int(product.find("p", "product-card__price--new").text.replace(",", "").strip("$"))
             material = material[material.find(": ") + 1 :].lstrip()
             firstColor = soup.find("div", {"data-element": "colorpicker"}).find("a").get("title").strip()
-            firstSize = soup.find("ul", "size-picker-drawer__list").find(size_available).text.strip()
+            firstSize = soup.find("ul", "size-picker-drawer__list").find('li').text.strip()
             firstDetail = detailList.find_all("li")[1].text.strip()
             
             item = {
@@ -122,7 +123,7 @@ def main():
             }
             
             # Appendings, using unique char and strip unnecessary spaces for easy text splitting from csv
-            sizes = soup.find("ul", "size-picker-drawer__list").find_all(size_available)
+            sizes = soup.find("ul", "size-picker-drawer__list").find_all('li')
             for size in sizes:
                 if not item["sizes"].count(size.text) > 0:
                     item["sizes"] += "/" + size.text.strip()
@@ -291,7 +292,7 @@ def main():
                 break
 
         for i, product in enumerate(items):
-            href = detailContainer.find(
+            href = product.find(
                 "div", "lv-product-card__name-wrapper"
             ).h2.a
             link = "https://us.louisvuitton.com/" + href.get("href")
@@ -301,7 +302,7 @@ def main():
             price = int(
                 round(
                     float(
-                        detailContainer.find(
+                        product.find(
                             "div", "lv-price lv-product-card__price body-s"
                         )
                         .span.text.strip(",")
@@ -360,6 +361,163 @@ def main():
 
         driver.close()
         csv = "lvProducts_Outwear.csv"
+    elif scraping == 'bb':
+        driver.get(luxuryUrls["bb"]["outerwear"])
+        driver.implicitly_wait(4)
+        soup = BeautifulSoup(driver.page_source, "lxml")
+        time.sleep(rand(1.0, 3.0))
+
+        amt = int(soup.find("p", {"data-testid": "product-total"}).text.strip(" items"))
+        print(amt)
+
+
+        h = 0
+        prevCount = 0
+        while True:
+            soup = BeautifulSoup(driver.page_source, "lxml")
+            items = soup.find_all("li", "product-listing-shelf__product-card")
+            count = len(items)
+            if not count == amt:
+                driver.execute_script(
+                    f"window.scrollTo(0, (document.body.scrollHeight / 100) * {str(h * (rand(5.0, 8.0)))} );"
+                )
+                time.sleep(rand(0.0, 1.0))
+
+                moreDiv = soup.find(
+                    "div", "product-listing-shelf__view-more-wrapper--compact"
+                )
+                moreButton = moreDiv and moreDiv.find('button')
+                
+                if moreButton:
+                    print(f"Clicking more {moreButton}")
+                    driver.find_element(
+                        By.CLASS_NAME,
+                        "product-listing-shelf__view-more-wrapper--compact",
+                    ).find_element(
+                        By.TAG_NAME,
+                        "button"
+                    ).click()
+
+                print(len(items))
+                h += 1
+                if count > prevCount:
+                    if prevCount > 0:
+                        h = max(1, (h - 3))
+                    prevCount = count
+
+            else:
+                break
+            
+        for i, product in enumerate(items):
+            href = product.a
+            link = "https://us.burberry.com/" + href.get("href")
+
+            name = href.find("h2", "product-card-v2-title").text.strip()
+
+            price = int(
+                round(
+                    float(
+                        href.find("span", "product-card-v2-price__current")
+                        .text
+                        .replace(",", '')
+                        .strip("$")
+                    )
+                )
+            )
+
+            colorVariants = href.find("ul", "product-card-v2-swatches__list")
+            
+            if colorVariants:
+                firstColor = colorVariants.find_all("li")[0].img.get("alt")
+                colors = colorVariants.find_all("li")[1:]
+            else:
+                firstColor = None
+                colors = []
+                
+            print(f"Gathering product {i} {link}")
+            response = requests.get(link, headers=headers)
+            soup = BeautifulSoup(response.text, "html.parser")
+            print("Success, scraping...")
+
+            if not firstColor:
+                firstColor = soup.find("div", "product-swatches-panel__description").span.text
+
+            detailContainer = soup.find("ul", "product-details-accordion").find_all(
+                "li", "product-details-accordion__item"
+            )
+            detailLi = detailContainer[0]
+
+
+            materials = detailContainer[2].find("ul").find_all('li')[:-2]
+
+            material = materials[0].span.text.replace("–", "").strip()
+            for mat in materials:
+                mat = mat.span.text.replace("–", "").strip()
+                if not material.count(mat) > 0:
+                    material += ", " + mat
+
+            description = detailLi.ul.li.span.text.strip().title()
+
+            id_ = detailLi.ul.find_all("li")[-1].span.text.replace("– Item", "").strip()
+
+            firstDetail = detailLi.ul.find_all("li")[1].span.text.replace("–", "").strip()
+
+            driver.get(link)
+            driver.implicitly_wait(3)
+
+            driver.find_element(
+                By.CLASS_NAME, "transactional-picker__options.size-picker__options"
+            ).click()
+            
+            time.sleep(2)
+            try:
+                sizes = driver.find_element(
+                By.CLASS_NAME,
+                "size-picker__radio-type-selector.size-picker__radio-type-selector-column",
+            ).find_elements(By.XPATH, "./*")
+            except:
+                driver.find_element(
+                    By.CLASS_NAME, "transactional-picker__options.size-picker__options"
+                ).click()
+                time.sleep(3)
+                sizes = driver.find_element(
+                    By.CLASS_NAME,
+                    "size-picker__radio-type-selector.size-picker__radio-type-selector-column",
+                ).find_elements(By.XPATH, "./*")
+            
+            
+            firstSize = sizes[0].find_element(By.TAG_NAME, "input").get_attribute("value")
+            
+            item = {
+                "name": name,
+                "id": id_,
+                "type": "Outerwear",
+                "price": price,
+                "material": material,
+                "description": description,
+                "colors": firstColor,
+                "sizes": firstSize,
+                "details": firstDetail,
+            }
+
+            # Appendings, using unique char and strip unnecessary spaces for easy text splitting from csv
+            for color in colors:
+                item["colors"] += "/" + color.img.get("alt").strip()
+
+            
+            for size in sizes[1:]:
+                size = size.find_element(By.TAG_NAME, "input").get_attribute("value")
+                if not item["sizes"].count(size) > 0:
+                    item["sizes"] += "/" + size
+
+            for tag in detailLi.ul.find_all("li")[2:-2]:
+                item["details"] += "|" + tag.span.text.replace("–", "").strip()
+
+            products.append(item)
+            print(f"Progress: {round(((i + 1) / amt) * 100, 1)}% ...")
+
+        driver.close()
+        csv = "bbProducts_Outwear.csv"
     elif scraping == 'mnml':
         response = requests.get(streetwearUrls["mnml"]['denim'])
         data = response.json()
@@ -416,7 +574,6 @@ def main():
     df = pd.DataFrame(products)
     df.to_csv(csv)
     print("Saved")
-
 
 if __name__ == "__main__":
     main()
