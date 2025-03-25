@@ -9,3 +9,8 @@ If things go smooth n easy as it is so far, may attempt first image recognition 
 # Commit 1
 - Mnml denim products scraped
 - Prada outwear products scraped
+
+# Commit 2
+- Added url dictionary for better organization
+- Bottega outwear products scraped
+- Louis V code made but selenium crawler being blocked, will have to tweak or just choose another brand
