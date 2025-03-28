@@ -9,7 +9,12 @@ If things go smooth n easy as it is so far, may attempt first image recognition 
 # Side Notes
 - If you use this for the scraper, you may scroll directly to elements if using chrome/explorer/etc for driver; with firefox scrolling has to be to specific positions because of a browser bug (has to be patched by selenium, doesnt effect users)
 
-# Commit 3 (most recent)
+# Commit 4 (most recent)
+- Prada denim, knitear, leather clothing, and suits scraped (started ml project and decided to predict within one brand across categories for start)
+- Folders for a little more organization
+- Category variable
+
+# Commit 3
 - Burberry outwear scraped
 
 # Commit 2

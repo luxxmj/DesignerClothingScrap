@@ -24,23 +24,28 @@ options = FirefoxOptions()
 options.headless = True
 driver = Firefox(options=options)
 
-# Indicate brand, (will add category soon)
-scraping = 'bb'
+# Indicate brand and category
+brand = 'prada'
+category = 'leather clothing'
 
 luxuryUrls = {
     "prada": {
-        "outerwear": "https://www.prada.com/us/en/mens/ready-to-wear/outerwear/c/10136US"
+        "outerwear": "https://www.prada.com/us/en/mens/ready-to-wear/outerwear/c/10136US",
+        "denim": "https://www.prada.com/us/en/mens/ready-to-wear/denim/c/10131US",
+        "suits": "https://www.prada.com/us/en/mens/ready-to-wear/suits/c/10139US",
+        "leather clothing": "https://www.prada.com/us/en/mens/ready-to-wear/leather-clothing/c/10135US",
+        "knitwear": "https://www.prada.com/us/en/mens/ready-to-wear/knitwear/c/10134US",
     },
-    "bv": {
+    "bottega": {
         "outerwear": [
             "https://www.bottegaveneta.com/en-us/men/men-clothing/coats",
             "https://www.bottegaveneta.com/en-us/men/men-clothing/jackets",
         ]
     },
-    "lv": {
+    "louis": {
         "outerwear": "https://us.louisvuitton.com/eng-us/men/ready-to-wear/coats/_/N-t1epdz97"
     },
-    "bb": {"outerwear": "https://us.burberry.com/l/mens-coats-jackets/"},
+    "burberry": {"outerwear": "https://us.burberry.com/l/mens-coats-jackets/"},
 }
 
 streetwearUrls = {
@@ -58,31 +63,48 @@ headers = {
 def size_available(tag):
     return tag.name == "li" and not tag.find("button", disabled=True)
 
-def main():
+def main() -> None:
     products = []
     rand = np.random.uniform
     
-    if scraping == 'prada':
+    if brand == 'prada':
         # Get page, accept cookies, and expand page to see all items
-        driver.get(luxuryUrls["prada"]['outerwear'])
+        driver.get(luxuryUrls["prada"][category])
         driver.implicitly_wait(5)
-        button = driver.find_element(By.XPATH, "//*[@aria-label='Show more']")
+        time.sleep(2)
+        
+        try:
+            button = driver.find_element(By.XPATH, "//*[@aria-label='Show more']")
+        except:
+            button = None
         driver.find_element(By.CLASS_NAME, "banner_cta").click()
         
         # Get expected product amount on page
         amtEle = driver.find_element(By.TAG_NAME, "p")
-        print(amtEle.get_attribute('class'))
         amt = int(amtEle.text[: amtEle.text.find(" ")])
+        print(f'{amt} {category} products')
         
-        button.click()
+        if button:
+            button.click()
         
+        h = 0
+        prevCount = 0
         # Scroll page until all items found (infinite scrolling javascript)
         while True:
             soup = BeautifulSoup(driver.page_source, "lxml")
             items = soup.find_all("a", class_="h-full product-card__link")
-            if not len(items) == amt:
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(1)
+            count = len(items)
+            print(f"Found {count}/{amt}...")
+            if not count >= amt:
+                driver.execute_script(
+                    f"window.scrollTo(0, (document.body.scrollHeight / 100) * {str(h * (10))} );"
+                )
+                time.sleep(.5)
+                h += 1
+                if count > prevCount:
+                    if prevCount > 0:
+                        h = max(1, (h - 3))
+                    prevCount = count
             else:
                 break
     
@@ -92,7 +114,7 @@ def main():
             print(f"Gathering product {i} {link}")
             response = requests.get(link, headers=headers)
             soup = BeautifulSoup(response.text, 'html.parser')
-            print("Success, scraping...")
+            print("Success, brand...")
             
             
             details = soup.find("div", "product-details-wrapper")
@@ -113,7 +135,7 @@ def main():
             item = {
                 "name": name,
                 "id": id_,
-                "type": "Outerwear",
+                "type": category.title(),
                 "price": price,
                 "material": material,
                 "description": description,
@@ -140,11 +162,9 @@ def main():
                 
             products.append(item)
             print(f"Progress: { round(((i+1) / amt) * 100, 1) }% ...")
-        driver.close()
-        csv = 'pradaProducts.csv'
-    elif scraping == 'bv':
-        for i, outerwear in enumerate(luxuryUrls["bv"]['outerwear']):
-            driver.get(outerwear)
+    elif brand == 'bottega':
+        for i, page in enumerate(luxuryUrls["bv"][category]):
+            driver.get(page)
             driver.implicitly_wait(4)
             # if i == 1:
             #     time.sleep(2)
@@ -180,7 +200,7 @@ def main():
                 print(f"Gathering product {i} {link}")
                 response = requests.get(link, headers=headers)
                 soup = BeautifulSoup(response.text, 'html.parser')
-                print("Success, scraping...")
+                print("Success, brand...")
                 
                 
                 detailContainer = soup.find("div", {"data-ref": "productContainerDetail"})
@@ -219,7 +239,7 @@ def main():
                 item = {
                     "name": name,
                     "id": id_,
-                    "type": "Outerwear",
+                    "type": category.title(),
                     "price": price,
                     "material": material,
                     "description": description,
@@ -245,10 +265,8 @@ def main():
                 products.append(item)
                 print(f"Progress: {round(((i + 1) / amt) * 100, 1)}% ...")
     
-        driver.close()
-        csv = "bvProducts_Outwear.csv"
-    elif scraping == 'lv':
-        driver.get(luxuryUrls["lv"]['outerwear'])
+    elif brand == 'louis':
+        driver.get(luxuryUrls["lv"][category])
         driver.implicitly_wait(4)
 
         time.sleep(rand(3.5, 4.5))
@@ -315,7 +333,7 @@ def main():
             print(f"Gathering product {i} {link}")
             response = requests.get(link, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
-            print("Success, scraping...")
+            print("Success, brand...")
 
             detailContainer = soup.find("div", "lv-expandable-panel__content")
             detailLi = detailContainer.find("ul")
@@ -338,7 +356,7 @@ def main():
             item = {
                 "name": name,
                 "id": id_,
-                "type": "Outerwear",
+                "type": category.title(),
                 "price": price,
                 "material": material,
                 "description": description,
@@ -359,10 +377,8 @@ def main():
             products.append(item)
             print(f"Progress: {round(((i + 1) / amt) * 100, 1)}% ...")
 
-        driver.close()
-        csv = "lvProducts_Outwear.csv"
-    elif scraping == 'bb':
-        driver.get(luxuryUrls["bb"]["outerwear"])
+    elif brand == 'burberry':
+        driver.get(luxuryUrls["bb"][category])
         driver.implicitly_wait(4)
         soup = BeautifulSoup(driver.page_source, "lxml")
         time.sleep(rand(1.0, 3.0))
@@ -437,7 +453,7 @@ def main():
             print(f"Gathering product {i} {link}")
             response = requests.get(link, headers=headers)
             soup = BeautifulSoup(response.text, "html.parser")
-            print("Success, scraping...")
+            print("Success, brand...")
 
             if not firstColor:
                 firstColor = soup.find("div", "product-swatches-panel__description").span.text
@@ -491,7 +507,7 @@ def main():
             item = {
                 "name": name,
                 "id": id_,
-                "type": "Outerwear",
+                "type": category.title(),
                 "price": price,
                 "material": material,
                 "description": description,
@@ -516,10 +532,8 @@ def main():
             products.append(item)
             print(f"Progress: {round(((i + 1) / amt) * 100, 1)}% ...")
 
-        driver.close()
-        csv = "bbProducts_Outwear.csv"
-    elif scraping == 'mnml':
-        response = requests.get(streetwearUrls["mnml"]['denim'])
+    elif brand == 'mnml':
+        response = requests.get(streetwearUrls["mnml"][category])
         data = response.json()
         amt = len(data["products"])
         print(f"{amt} products found")
@@ -568,8 +582,10 @@ def main():
             
             products.append(item)
             print(f"Progress: {round(((i + 1) / amt) * 100, 1)}% ({i+1}/{amt})...")
-            
-        csv = "mnmlProducts.csv"
+    
+    
+    driver.close()
+    csv = f"{brand.title()}/{brand}Products_{category.replace(" ", "-").title()}.csv"
     
     df = pd.DataFrame(products)
     df.to_csv(csv)
